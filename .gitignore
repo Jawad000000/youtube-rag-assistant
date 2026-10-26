@@ -6,4 +6,5 @@ __pycache__/
 *.log
 INTERVIEW_GUIDE.md
 COMPLETE_ENGINEERING_GUIDE.md
+BUILD_STORY_PLAYBOOK.md
 test_user_video.py
