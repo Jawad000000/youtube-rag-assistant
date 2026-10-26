@@ -5,4 +5,5 @@ __pycache__/
 .pytest_cache/
 *.log
 INTERVIEW_GUIDE.md
+COMPLETE_ENGINEERING_GUIDE.md
 test_user_video.py
