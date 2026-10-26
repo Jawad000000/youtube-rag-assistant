@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Mohd jawwad", email = "mohdjawwad73@gmail.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.162.0",
     "groq>=1.7.0",
