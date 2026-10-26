@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video RAG Assistant | Qdrant + Groq</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0c10;
+            --bg-secondary: #12161f;
+            --bg-card: #181f2c;
+            --border: #263044;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.2);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --danger: #ef4444;
+            --success: #10b981;
+            --yt-red: #ff0000;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2.5rem 1rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .badge-row {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .badge {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            color: #60a5fa;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            border-radius: 9999px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.4rem;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.8rem 1rem;
+            color: #fff;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        button {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.8rem 1.4rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status-box {
+            margin-top: 1rem;
+            padding: 0.8rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            display: none;
+        }
+
+        .status-box.success {
+            display: block;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: #34d399;
+        }
+
+        .status-box.error {
+            display: block;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: #f87171;
+        }
+
+        /* Q&A Section */
+        .answer-box {
+            margin-top: 1.5rem;
+            padding: 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            line-height: 1.6;
+            display: none;
+        }
+
+        .answer-text {
+            color: #e2e8f0;
+            font-size: 0.95rem;
+            white-space: pre-wrap;
+        }
+
+        .latency-row {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            padding-top: 0.75rem;
+        }
+
+        .citations-header {
+            margin-top: 1.2rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .citation-card {
+            background: rgba(10, 12, 16, 0.7);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin-top: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .citation-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .timestamp-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            color: #60a5fa;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.85rem;
+            background: rgba(59, 130, 246, 0.15);
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .timestamp-link:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .score-pill {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .citation-content {
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            line-height: 1.4;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="badge-row">
+                <span class="badge">FastAPI</span>
+                <span class="badge">Qdrant Vector DB</span>
+                <span class="badge">Groq (Llama-3.1)</span>
+                <span class="badge">all-MiniLM-L6-v2</span>
+            </div>
+            <h1>YouTube Video RAG Assistant</h1>
+            <p class="subtitle">Index any YouTube video transcript into Qdrant and ask questions with exact timestamp jump-links.</p>
+        </header>
+
+        <!-- Video Ingestion Card -->
+        <section class="card">
+            <div class="card-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>
+                1. Ingest YouTube Video
+            </div>
+            <div class="input-group">
+                <input type="text" id="videoUrlInput" placeholder="Enter YouTube URL (e.g. https://www.youtube.com/watch?v=...)">
+                <button id="indexBtn" onclick="indexVideo()">
+                    <span id="indexBtnText">Index Video</span>
+                    <span id="indexSpinner" class="spinner" style="display: none;"></span>
+                </button>
+            </div>
+            <div id="indexStatus" class="status-box"></div>
+        </section>
+
+        <!-- Q&A Query Card -->
+        <section class="card">
+            <div class="card-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                2. Ask Grounded Questions
+            </div>
+            <div class="input-group">
+                <input type="text" id="queryInput" placeholder="Ask what was discussed in the video..." onkeydown="if(event.key==='Enter') runQuery()">
+                <button id="queryBtn" onclick="runQuery()">
+                    <span id="queryBtnText">Ask AI</span>
+                    <span id="querySpinner" class="spinner" style="display: none;"></span>
+                </button>
+            </div>
+
+            <!-- Answer display -->
+            <div id="answerBox" class="answer-box">
+                <div id="answerText" class="answer-text"></div>
+                
+                <div class="citations-header">Cited Video Moments & Context</div>
+                <div id="citationsContainer"></div>
+
+                <div class="latency-row">
+                    <span>⚡ Vector Retrieval: <strong id="retrievalMs">0</strong>ms</span>
+                    <span>🤖 Groq LLM: <strong id="genMs">0</strong>ms</span>
+                    <span>Total Latency: <strong id="totalMs">0</strong>ms</span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        let currentVideoId = null;
+
+        async function indexVideo() {
+            const urlInput = document.getElementById("videoUrlInput");
+            const btn = document.getElementById("indexBtn");
+            const btnText = document.getElementById("indexBtnText");
+            const spinner = document.getElementById("indexSpinner");
+            const statusBox = document.getElementById("indexStatus");
+
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert("Please paste a valid YouTube video URL.");
+                return;
+            }
+
+            btn.disabled = true;
+            btnText.style.display = "none";
+            spinner.style.display = "inline-block";
+            statusBox.className = "status-box";
+            statusBox.style.display = "none";
+
+            try {
+                const res = await fetch("/api/v1/index-video", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ video_url: url })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || "Indexing failed");
+                }
+
+                currentVideoId = data.video_id;
+                statusBox.className = "status-box success";
+                statusBox.innerHTML = `✅ <strong>Video Indexed!</strong> ${data.total_chunks_created} semantic chunks stored in Qdrant across ${Math.round(data.total_duration_seconds / 60)} minutes of footage. Ready for queries!`;
+            } catch (err) {
+                statusBox.className = "status-box error";
+                statusBox.innerHTML = `❌ <strong>Error:</strong> ${err.message}`;
+            } finally {
+                btn.disabled = false;
+                btnText.style.display = "inline-block";
+                spinner.style.display = "none";
+            }
+        }
+
+        async function runQuery() {
+            const queryInput = document.getElementById("queryInput");
+            const btn = document.getElementById("queryBtn");
+            const btnText = document.getElementById("queryBtnText");
+            const spinner = document.getElementById("querySpinner");
+            const answerBox = document.getElementById("answerBox");
+            const answerText = document.getElementById("answerText");
+            const citationsContainer = document.getElementById("citationsContainer");
+
+            const q = queryInput.value.trim();
+            if (!q) return;
+
+            btn.disabled = true;
+            btnText.style.display = "none";
+            spinner.style.display = "inline-block";
+
+            try {
+                const res = await fetch("/api/v1/query", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        query: q,
+                        video_id: currentVideoId,
+                        top_k: 3
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || "Query failed");
+                }
+
+                answerBox.style.display = "block";
+                answerText.innerText = data.answer;
+
+                document.getElementById("retrievalMs").innerText = data.retrieval_latency_ms;
+                document.getElementById("genMs").innerText = data.generation_latency_ms;
+                document.getElementById("totalMs").innerText = data.total_latency_ms;
+
+                citationsContainer.innerHTML = "";
+                if (data.citations && data.citations.length > 0) {
+                    data.citations.forEach(c => {
+                        const div = document.createElement("div");
+                        div.className = "citation-card";
+                        div.innerHTML = `
+                            <div class="citation-top">
+                                <a href="${c.metadata.youtube_timestamp_url}" target="_blank" class="timestamp-link">
+                                    ▶ Jump to ${c.metadata.timestamp_formatted}
+                                </a>
+                                <span class="score-pill">Cosine Sim: ${c.score}</span>
+                            </div>
+                            <div class="citation-content">"${c.text}"</div>
+                        `;
+                        citationsContainer.appendChild(div);
+                    });
+                } else {
+                    citationsContainer.innerHTML = "<p style='color:#94a3b8; font-size:0.85rem;'>No citations returned.</p>";
+                }
+
+            } catch (err) {
+                alert("Query failed: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btnText.style.display = "inline-block";
+                spinner.style.display = "none";
+            }
+        }
+    </script>
+</body>
+</html>
