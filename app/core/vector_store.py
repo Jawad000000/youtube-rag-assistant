@@ -31,25 +31,36 @@ else:
 COLLECTION_NAME = settings.COLLECTION_NAME
 EMBEDDING_SIZE = settings.EMBEDDING_SIZE
 
-# create collection if it doesnt exist
-if not qdrant.collection_exists(COLLECTION_NAME):
-    qdrant.create_collection(
-        collection_name=COLLECTION_NAME,
-        vectors_config=VectorParams(
-            size=EMBEDDING_SIZE,
-            distance=Distance.COSINE
-        )
-    )
-    # index video_id so we can filter by it
-    try:
-        qdrant.create_payload_index(
+def init_collection():
+    if not qdrant.collection_exists(COLLECTION_NAME):
+        qdrant.create_collection(
             collection_name=COLLECTION_NAME,
-            field_name="video_id",
-            field_schema=PayloadSchemaType.KEYWORD
+            vectors_config=VectorParams(
+                size=EMBEDDING_SIZE,
+                distance=Distance.COSINE
+            )
         )
-    except Exception:
-        pass
-    print(f"created collection: {COLLECTION_NAME}")
+        try:
+            qdrant.create_payload_index(
+                collection_name=COLLECTION_NAME,
+                field_name="video_id",
+                field_schema=PayloadSchemaType.KEYWORD
+            )
+        except Exception:
+            pass
+        print(f"created collection: {COLLECTION_NAME}")
+
+init_collection()
+
+def clear_collection():
+    """Wipes all previous video vectors completely to prevent cross-video pollution."""
+    try:
+        if qdrant.collection_exists(COLLECTION_NAME):
+            qdrant.delete_collection(COLLECTION_NAME)
+            print(f"deleted old collection: {COLLECTION_NAME}")
+        init_collection()
+    except Exception as e:
+        print(f"error clearing collection: {e}")
 
 
 def upsert_chunks(chunks, vectors):
@@ -62,7 +73,7 @@ def upsert_chunks(chunks, vectors):
         points.append(PointStruct(
             id=point_id,
             vector=vector,
-            payload=chunk  # chunk dict already has everything we need
+            payload=chunk
         ))
 
     qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
@@ -70,7 +81,6 @@ def upsert_chunks(chunks, vectors):
 
 
 def search(query_vector, top_k=3, video_id=None):
-    # filter by video_id if provided
     search_filter = None
     if video_id:
         search_filter = Filter(
@@ -90,7 +100,6 @@ def search(query_vector, top_k=3, video_id=None):
             limit=top_k
         ).points
     except AttributeError:
-        # older qdrant client uses search instead of query_points
         results = qdrant.search(
             collection_name=COLLECTION_NAME,
             query_vector=query_vector,

@@ -93,11 +93,33 @@
 
         .card-header {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 0.5rem;
             margin-bottom: 1rem;
             font-size: 1.1rem;
             font-weight: 600;
+            color: #fff;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-clear {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            font-size: 0.75rem;
+            padding: 0.3rem 0.7rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-clear:hover {
+            background: var(--danger);
             color: #fff;
         }
 
@@ -123,7 +145,7 @@
             box-shadow: 0 0 0 3px var(--accent-glow);
         }
 
-        button {
+        button.primary-btn {
             background: var(--accent);
             color: #fff;
             border: none;
@@ -137,7 +159,7 @@
             gap: 0.4rem;
         }
 
-        button:hover {
+        button.primary-btn:hover {
             filter: brightness(1.1);
         }
 
@@ -285,12 +307,15 @@
         <!-- Video Ingestion Card -->
         <section class="card">
             <div class="card-header">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>
-                1. Ingest YouTube Video
+                <div class="header-left">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>
+                    <span>1. Ingest YouTube Video</span>
+                </div>
+                <button class="btn-clear" onclick="resetDatabase()">Reset / Clear DB</button>
             </div>
             <div class="input-group">
                 <input type="text" id="videoUrlInput" placeholder="Enter YouTube URL (e.g. https://www.youtube.com/watch?v=...)">
-                <button id="indexBtn" onclick="indexVideo()">
+                <button id="indexBtn" class="primary-btn" onclick="indexVideo()">
                     <span id="indexBtnText">Index Video</span>
                     <span id="indexSpinner" class="spinner" style="display: none;"></span>
                 </button>
@@ -301,12 +326,14 @@
         <!-- Q&A Query Card -->
         <section class="card">
             <div class="card-header">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                2. Ask Grounded Questions
+                <div class="header-left">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <span>2. Ask Grounded Questions</span>
+                </div>
             </div>
             <div class="input-group">
                 <input type="text" id="queryInput" placeholder="Ask what was discussed in the video..." onkeydown="if(event.key==='Enter') runQuery()">
-                <button id="queryBtn" onclick="runQuery()">
+                <button id="queryBtn" class="primary-btn" onclick="runQuery()">
                     <span id="queryBtnText">Ask AI</span>
                     <span id="querySpinner" class="spinner" style="display: none;"></span>
                 </button>
@@ -329,7 +356,34 @@
     </div>
 
     <script>
-        let currentVideoId = null;
+        // Check localStorage to retain current indexed video on page refresh
+        let currentVideoId = localStorage.getItem("currentVideoId") || null;
+
+        // Automatically wipe database if user wants a clean slate on browser refresh
+        window.addEventListener("DOMContentLoaded", () => {
+            const savedVideo = localStorage.getItem("currentVideoId");
+            if (savedVideo) {
+                const statusBox = document.getElementById("indexStatus");
+                statusBox.className = "status-box success";
+                statusBox.innerHTML = `Active Video: <strong>${savedVideo}</strong>. Enter questions below, or enter a new link to replace it.`;
+            }
+        });
+
+        async function resetDatabase() {
+            if (!confirm("Are you sure you want to clear the vector database?")) return;
+            try {
+                await fetch("/api/v1/reset-session", { method: "POST" });
+                localStorage.removeItem("currentVideoId");
+                currentVideoId = null;
+                document.getElementById("videoUrlInput").value = "";
+                document.getElementById("answerBox").style.display = "none";
+                const statusBox = document.getElementById("indexStatus");
+                statusBox.className = "status-box success";
+                statusBox.innerHTML = "🧹 Database wiped clean! Ready for a new video.";
+            } catch (err) {
+                alert("Failed to reset database: " + err.message);
+            }
+        }
 
         async function indexVideo() {
             const urlInput = document.getElementById("videoUrlInput");
@@ -337,6 +391,7 @@
             const btnText = document.getElementById("indexBtnText");
             const spinner = document.getElementById("indexSpinner");
             const statusBox = document.getElementById("indexStatus");
+            const answerBox = document.getElementById("answerBox");
 
             const url = urlInput.value.trim();
             if (!url) {
@@ -349,6 +404,7 @@
             spinner.style.display = "inline-block";
             statusBox.className = "status-box";
             statusBox.style.display = "none";
+            answerBox.style.display = "none";
 
             try {
                 const res = await fetch("/api/v1/index-video", {
@@ -363,8 +419,9 @@
                 }
 
                 currentVideoId = data.video_id;
+                localStorage.setItem("currentVideoId", currentVideoId);
                 statusBox.className = "status-box success";
-                statusBox.innerHTML = `✅ <strong>Video Indexed!</strong> ${data.total_chunks_created} semantic chunks stored in Qdrant across ${Math.round(data.total_duration_seconds / 60)} minutes of footage. Ready for queries!`;
+                statusBox.innerHTML = `✅ <strong>Video Indexed!</strong> Wiped old vectors and stored ${data.total_chunks_created} semantic chunks for video <code>${data.video_id}</code>. Ready for queries!`;
             } catch (err) {
                 statusBox.className = "status-box error";
                 statusBox.innerHTML = `❌ <strong>Error:</strong> ${err.message}`;
@@ -387,6 +444,13 @@
             const q = queryInput.value.trim();
             if (!q) return;
 
+            // Make sure we have an active video ID
+            const activeId = currentVideoId || localStorage.getItem("currentVideoId");
+            if (!activeId) {
+                alert("Please index a video first before asking questions!");
+                return;
+            }
+
             btn.disabled = true;
             btnText.style.display = "none";
             spinner.style.display = "inline-block";
@@ -397,7 +461,7 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         query: q,
-                        video_id: currentVideoId,
+                        video_id: activeId,
                         top_k: 3
                     })
                 });

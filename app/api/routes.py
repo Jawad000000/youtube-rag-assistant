@@ -17,10 +17,20 @@ from app.config import settings
 router = APIRouter()
 
 
+@router.post("/reset-session")
+async def reset_session():
+    """Wipes the Qdrant database completely so no old video data remains."""
+    vector_store.clear_collection()
+    return {"status": "success", "message": "Qdrant collection wiped clean."}
+
+
 @router.post("/index-video", response_model=VideoIndexResponse, status_code=status.HTTP_201_CREATED)
 async def index_youtube_video(payload: VideoIndexRequest):
     try:
-        # step 1: get transcript
+        # Step 0: Always wipe previous video data before indexing a new one!
+        vector_store.clear_collection()
+
+        # Step 1: get transcript
         video_id, raw_segments = fetch_transcript(payload.video_url)
 
         if not raw_segments:
@@ -29,16 +39,16 @@ async def index_youtube_video(payload: VideoIndexRequest):
                 detail="no captions found for this video"
             )
 
-        # step 2: chunk the transcript
+        # Step 2: chunk the transcript
         chunk_size = payload.chunk_size or settings.DEFAULT_CHUNK_SIZE
         chunk_overlap = payload.chunk_overlap or settings.DEFAULT_CHUNK_OVERLAP
         chunks = chunk_transcript(video_id, raw_segments, chunk_size, chunk_overlap)
 
-        # step 3: embed the chunks
+        # Step 3: embed the chunks
         texts = [c["text"] for c in chunks]
         vectors = embed_texts(texts)
 
-        # step 4: store in qdrant
+        # Step 4: store in qdrant
         vector_store.upsert_chunks(chunks, vectors)
 
         last_seg = raw_segments[-1]
@@ -67,7 +77,7 @@ async def query_video(payload: QueryRequest):
     # embed the query
     query_vector = embed_query(payload.query)
 
-    # search qdrant
+    # search qdrant strictly for this video if specified
     top_chunks = vector_store.search(
         query_vector=query_vector,
         top_k=payload.top_k or settings.DEFAULT_TOP_K,
@@ -84,7 +94,6 @@ async def query_video(payload: QueryRequest):
     gen_ms = (t2 - t1) * 1000
     total_ms = (t2 - t0) * 1000
 
-    # build citations in the schema format
     from app.models.schemas import VideoChunkDetail, VideoChunkMetadata
     citations = []
     for c in top_chunks:
